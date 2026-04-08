@@ -1,6 +1,6 @@
-# 🛡️ ThreatLens — AI-Powered Autonomous Security Scanner
+# 🛡️ PortBiter — AI-Powered Autonomous Security Scanner
 
-ThreatLens is a next-generation web security scanning platform that uses agentic AI to autonomously detect vulnerabilities in web applications and generate structured, actionable security reports.
+PortBiter is a next-generation web security scanning platform that uses agentic AI to autonomously detect vulnerabilities in web applications and generate structured, actionable security reports.
 
 ---
 
