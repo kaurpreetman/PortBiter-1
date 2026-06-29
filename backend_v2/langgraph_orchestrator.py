@@ -2,7 +2,7 @@ import asyncio
 import re
 
 from langchain_core.messages import HumanMessage
-from backend_v2.langgraph_workflow import create_workflow
+from backend_v2.langgraph_workflow import NoLLMConfiguredError, create_workflow
 from backend_v2.models import Vulnerability
 from backend_v2.state import state_db
 from backend_v2.tool_registry import SECURITY_TOOLS
@@ -12,7 +12,12 @@ class LangGraphOrchestrator:
     def __init__(self, scan_id: str, target_url: str):
         self.scan_id = scan_id
         self.target_url = target_url
-        self.app = create_workflow()
+        self.app = None
+        self.startup_error = None
+        try:
+            self.app = create_workflow()
+        except NoLLMConfiguredError as exc:
+            self.startup_error = exc
 
     def append_log(self, text: str):
         state = state_db[self.scan_id]
@@ -31,11 +36,14 @@ class LangGraphOrchestrator:
 
         Strategy:
         1. Start with the web_crawler tool to map the application.
-        2. Run the header_checker on the target root URL.
+        2. Run the security_headers_checker on the target root URL.
         3. Run the file_exposer on the target root URL.
         4. If a login or authentication endpoint is discovered, run auth_tester on that login URL directly, not on the root URL.
-        5. Run xss_scanner on endpoints that contain query parameters or forms.
-        6. If an upload endpoint is discovered, run upload_checker on that endpoint.
+        5. Run xss_tester on endpoints that contain query parameters or forms.
+        6. Run sql_injection_tester for login and search-style endpoints.
+        7. If an upload endpoint is discovered, run file_upload_tester on that endpoint.
+        8. Optionally run port_scanner for common open ports on the target host.
+        9. Prefer the registered tool names exactly as listed above and avoid inventing tool names.
 
         CRITICAL: When you have found a vulnerability, report it in a concise format and do not include extra conversation.
         Format each vulnerability as:
@@ -165,6 +173,13 @@ class LangGraphOrchestrator:
 
     async def run_scan(self):
         self.append_log("Initializing LangGraph Autonomous Scan...")
+
+        if self.app is None and self.startup_error:
+            self.append_log(f"Scan startup failed: {self.startup_error}")
+            state_db[self.scan_id].status = "error"
+            state_db[self.scan_id].progress = 0
+            state_db[self.scan_id].save()
+            return
 
         system_prompt = self._build_system_prompt()
 

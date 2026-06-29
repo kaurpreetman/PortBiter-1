@@ -1,121 +1,39 @@
-# 🛡️ PortBiter — AI-Powered Autonomous Security Scanner
+# 🛡️ PortBiter
 
-PortBiter is a next-generation web security scanning platform that uses agentic AI to autonomously detect vulnerabilities in web applications and generate structured, actionable security reports.
+PortBiter is an AI-assisted web security scanner that combines a FastAPI backend, a LangGraph-style planner, and a Next.js dashboard to run safe, evidence-based scans and generate reports.
 
----
+## What is implemented
 
-## 🚀 Features
+- Safe target validation with a policy engine
+- Live scan progress over WebSocket
+- Evidence-based vulnerability reporting
+- PDF report export from the backend
+- A dashboard for launching scans and viewing findings
 
-- 🤖 **Agentic AI Orchestration**
-  - LLM-driven decision making (Groq-powered)
-  - Dynamically selects and executes security tests
+## Quick start
 
-- 🔍 **Automated Vulnerability Detection**
-  - XSS (Cross-Site Scripting)
-  - SQL Injection (safe simulation)
-  - Security headers misconfiguration
-  - File exposure (.env, backups, configs)
-  - File upload vulnerabilities
+1. Create a Python environment and install dependencies:
+   - `python -m venv .venv`
+   - `.venv\Scripts\activate`
+   - `pip install -r backend_v2/requirements.txt`
+2. Copy [.env.example](.env.example) to `.env` and add a `GROQ_API_KEY` if you want the autonomous planner enabled.
+3. Start the backend:
+   - `uvicorn backend_v2.api:app --reload --host 0.0.0.0 --port 8000`
+4. Start the frontend:
+   - `cd frontend && npm install && npm run dev`
 
-- ⚡ **Real-Time Live Dashboard**
-  - WebSocket-based updates
-  - Live scan progress & logs
-  - Vulnerabilities appear instantly
+## Notes
 
-- 🛡️ **Policy Engine (Safety First)**
-  - Prevents destructive payloads
-  - Restricts unauthorized scanning
-  - Enforces safe testing rules
+- Without `GROQ_API_KEY`, the API will return an explicit `503` when a scan is requested, which keeps the workflow honest and avoids pretending a scan completed.
+- `ALLOW_LOCALHOST`, `ALLOW_INTERNAL`, and `ALLOWED_DOMAINS` control whether local/private targets are allowed; set them explicitly for internal test environments.
+- The scanner is intended for authorized testing only.
 
-- 📊 **Structured Reporting**
-  - CVSS-based severity scoring
-  - Clear explanation of vulnerabilities
-  - Impact + remediation guidance
-  - PDF report generation
+## API highlights
 
----
-
-## 🧠 How It Works
-
-ThreatLens follows an intelligent agent loop:
-
-1. **Planner (AI)** → decides next action  
-2. **Policy Engine** → validates safety  
-3. **Executor** → runs security tool  
-4. **Analyzer (AI)** → interprets results  
-5. **State Update** → stores findings  
-6. 🔁 Repeat until scan completes  
-
----
-
-## 🏗️ Tech Stack
-
-**Frontend**
-- React / Next.js
-- Tailwind CSS
-- WebSockets (live updates)
-
-**Backend**
-- FastAPI
-- Async execution
-- WebSocket server
-
-**AI Layer**
-- Groq (LLM inference)
-- Agent-based orchestration
-
-**Core Systems**
-- Tool Registry (anti-hallucination)
-- Policy Engine
-- Scan Manager
-- Reporting Engine
-
----
-
-## 📡 API Endpoints
-
-- `POST /scan` → Start scan  
-- `GET /scan/{id}` → Get status  
-- `GET /scans` → List scans  
-- `WS /ws/{scan_id}` → Live updates  
-- `GET /report/pdf/{scan_id}` → Download report  
-
----
-
-## 🎯 Use Cases
-
-- Security testing for your own applications  
-- Bug bounty research (authorized targets only)  
-- Educational security labs  
-- AI-driven penetration testing research  
-
----
-
-## ⚠️ Disclaimer
-
-This tool is intended **only for authorized security testing**.  
-Do NOT use against systems without permission.
-
----
-
-## 💡 Vision
-
-ThreatLens aims to redefine security testing by combining:
-- AI reasoning
-- autonomous agents
-- real-time intelligence
-
-into a single powerful platform.
-
----
-
-## ⭐ Future Improvements
-
-- Advanced vulnerability coverage
-- Multi-target scanning
-- Authentication testing
-- Scan replay & history
-- Team collaboration features
-
----
+- `POST /scan`
+- `GET /scan/{scan_id}`
+- `GET /scans`
+- `WS /ws/{scan_id}`
+- `GET /report/{scan_id}`
+- `GET /report/pdf/{scan_id}`
 

@@ -39,6 +39,9 @@ async def start_scan(req: ScanRequest, background_tasks: BackgroundTasks):
     except PolicyViolationError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
 
+    if not os.getenv("GROQ_API_KEY"):
+        raise HTTPException(status_code=503, detail="Autonomous planning is unavailable because GROQ_API_KEY is not configured.")
+
     scan_id = str(uuid.uuid4())
     scan_state = ScanState(target_url=req.target_url, scan_id=scan_id)
     scan_state.save()
@@ -123,120 +126,6 @@ async def generate_report_ep(scan_id: str):
         "visited_urls": list(set(state.visited_urls)),
         "vulnerabilities": state.vulnerabilities,
     }
-
-    system_prompt = """You are a senior penetration tester and security report writer.
-
-Your task is to generate a professional, client-ready PDF security assessment report for an AI-powered vulnerability scanner called "PortBiter v3.0".
-
-⚠️ Requirements:
-- The report must be detailed, structured, and professional.
-- Write in formal, clear, non-technical language for executives, but include technical depth where needed.
-- Assume all testing was authorized and conducted safely (non-destructive).
-
----
-
-📄 REPORT STRUCTURE (STRICTLY FOLLOW)
-
-1. COVER PAGE
-- Title: "Security Assessment Report"
-- Tool: PortBiter v3.0
-- Target URL
-- Scan Date
-- Prepared by: AI Security Auditor
-- Confidentiality note
-
----
-
-2. EXECUTIVE SUMMARY
-- High-level overview (non-technical)
-- Overall risk level (LOW/MEDIUM/HIGH/CRITICAL)
-- Key findings summary
-- Business impact
-
----
-
-3. SCOPE & METHODOLOGY
-- Scope (target URL)
-- Testing type: Safe, simulated vulnerability scanning
-- Methodology inspired by OWASP standards
-- Limitations (no destructive testing)
-
----
-
-4. ATTACK SURFACE ANALYSIS
-- Total endpoints discovered
-- Sensitive endpoints
-- Public vs authenticated routes
-- Observations
-
----
-
-5. RISK SUMMARY
-- Table of vulnerabilities by severity
-- Pie-chart style description (textual)
-
----
-
-6. DETAILED FINDINGS (MOST IMPORTANT)
-
-For EACH vulnerability include:
-
-- ID
-- Title
-- Severity
-- CVSS Score + Vector
-- Affected Endpoint
-- Description
-- Impact
-- Proof of Concept (safe payload)
-- Reproduction Steps
-- Recommendation
-- Remediation Priority
-- Confidence Score
-
----
-
-7. AI EXECUTION INSIGHTS (UNIQUE FEATURE)
-- Explain how AI decided what to scan
-- Show step-by-step reasoning
-- Highlight adaptive scanning behavior
-
----
-
-8. RECOMMENDATIONS SUMMARY
-- Prioritized fixes
-- Quick wins vs long-term fixes
-
----
-
-9. CONCLUSION
-- Overall security posture
-- Final risk statement
-
----
-
-10. APPENDIX
-- Tools used
-- Scan metadata
-- Timestamp logs
-
----
-
-🎯 STYLE REQUIREMENTS:
-- Use headings and subheadings
-- Use bullet points where appropriate
-- Keep tone professional (like Deloitte / PwC reports)
-- Avoid overly casual language
-- Explain technical terms briefly
-
----
-
-🚀 OUTPUT FORMAT:
-Return a fully formatted report in MARKDOWN suitable for PDF conversion.
-
-Do NOT return JSON.
-Do NOT skip sections.
-Ensure content is detailed and polished."""
 
     from backend_v2.report_builder import build_report_markdown
 

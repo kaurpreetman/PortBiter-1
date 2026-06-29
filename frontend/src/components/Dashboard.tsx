@@ -60,34 +60,18 @@ export default function Dashboard() {
     if (!scanId) return;
     setLoadingReport(true);
     try {
-      const res = await fetch(`${API_BASE}/report/${scanId}`);
+      const res = await fetch(`${API_BASE}/report/pdf/${scanId}`);
       if (!res.ok) throw new Error('Failed to generate report');
 
-      const payload = await res.json();
-      const markdownText = payload.markdown || 'No report content';
-      const container = document.createElement('div');
-      container.style.width = '794px';
-      container.style.padding = '32px';
-      container.style.background = '#ffffff';
-      container.style.color = '#111827';
-      container.style.fontFamily = 'Arial, sans-serif';
-
-      const pre = document.createElement('pre');
-      pre.style.whiteSpace = 'pre-wrap';
-      pre.style.fontFamily = 'Arial, sans-serif';
-      pre.textContent = markdownText;
-      container.appendChild(pre);
-      document.body.appendChild(container);
-
-      const html2pdfModule = (await import('html2pdf.js')).default;
-      await html2pdfModule().set({
-        margin: 10,
-        filename: `PortBiter_Report_${scanId}.pdf`,
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      }).from(container).save();
-
-      document.body.removeChild(container);
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `PortBiter_Report_${scanId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error(error);
       alert('Error generating PDF report.');
@@ -109,6 +93,12 @@ export default function Dashboard() {
       });
 
       const data = await res.json();
+      if (!res.ok) {
+        setStatus('error');
+        setLogs((prev) => [...prev, `❌ ${data.detail || 'Scan request failed.'}`]);
+        return;
+      }
+
       if (data.scan_id) {
         setScanId(data.scan_id);
         connectWs(data.scan_id);

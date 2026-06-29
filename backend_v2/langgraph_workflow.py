@@ -1,13 +1,16 @@
 from typing import TypedDict, Annotated, Sequence
 import operator
 import os
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
+from langchain_core.messages import BaseMessage
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 from backend_v2.tool_registry import SECURITY_TOOLS
 
 
-# Provide a lightweight local fallback LLM when GROQ_API_KEY is not configured.
+class NoLLMConfiguredError(RuntimeError):
+    """Raised when autonomous planning was requested without a configured LLM backend."""
+
+
 class _LocalFallbackLLM:
     def __init__(self, *args, **kwargs):
         pass
@@ -29,15 +32,15 @@ class AgentState(TypedDict):
     scan_id: str
 
 def create_workflow():
+    if not os.getenv("GROQ_API_KEY"):
+        raise NoLLMConfiguredError("GROQ_API_KEY is not configured. Set it to enable autonomous planning.")
+
     # 1. Setup Planner
     try:
-        if os.getenv("GROQ_API_KEY"):
-            from langchain_groq import ChatGroq
-            llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.1)
-        else:
-            llm = _LocalFallbackLLM()
-    except Exception:
-        llm = _LocalFallbackLLM()
+        from langchain_groq import ChatGroq
+        llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.1)
+    except Exception as exc:
+        raise NoLLMConfiguredError("Unable to initialize the Groq-backed planner. Check LANGCHAIN or Groq installation details.") from exc
 
     llm_with_tools = llm.bind_tools(SECURITY_TOOLS)
     

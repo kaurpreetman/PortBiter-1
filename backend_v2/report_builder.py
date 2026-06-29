@@ -4,13 +4,14 @@ from langchain_core.messages import SystemMessage, HumanMessage
 
 
 def _build_system_prompt(vuln_types):
+    allowed = ', '.join(vuln_types) if vuln_types else 'none'
     return f"""
-You are a security report writer.
+You are a senior security report writer for PortBiter.
 Only produce findings that are present in the input data. Do NOT invent new vulnerability categories or findings.
-Allowed findings: {', '.join(vuln_types) if vuln_types else 'none'}
-Provide a professional markdown report based exclusively on the provided scan JSON.
-Include: cover, executive summary, scope & methodology, risk summary, detailed findings (one per provided finding), recommendations, appendix.
-Do not add vulnerabilities that are not present in the input.
+Allowed findings: {allowed}
+Produce a polished markdown report based exclusively on the provided scan JSON.
+Include a cover, executive summary, scope and methodology, risk summary, detailed findings (one per provided finding), prioritized recommendations, and an appendix.
+Use concise executive language, include CVSS-style severity labels when available, and keep the content evidence-grounded.
 """
 
 
@@ -32,7 +33,8 @@ def build_report_markdown(scan_json: dict) -> str:
                 SystemMessage(content=system_prompt),
                 HumanMessage(content=f"SCAN_JSON: {json.dumps(scan_json, default=str)}")
             ])
-            return msg.content
+            if getattr(msg, "content", None):
+                return msg.content
         except Exception:
             # Fall through to local renderer on error
             pass
@@ -47,7 +49,7 @@ def build_report_markdown(scan_json: dict) -> str:
     lines.append("This report contains only findings that were directly observed by automated tools. No additional issues were inferred.")
     lines.append("")
     lines.append("## Scope & Methodology")
-    lines.append("Automated, non-destructive HTTP-based scanning. Tools exercised: web_crawler, header_checker, xss_scanner, upload_checker, auth_tester.")
+    lines.append("Automated, non-destructive HTTP-based scanning. Tools exercised: web_crawler, security_headers_checker, xss_tester, file_upload_tester, sql_injection_tester, auth_tester, port_scanner.")
     lines.append("")
     lines.append("## Risk Summary")
     if vulnerabilities:
