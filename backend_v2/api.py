@@ -9,7 +9,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fpdf import FPDF
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_groq import ChatGroq
 from pydantic import BaseModel
 
 from backend_v2.langgraph_orchestrator import LangGraphOrchestrator
@@ -41,7 +40,9 @@ async def start_scan(req: ScanRequest, background_tasks: BackgroundTasks):
         raise HTTPException(status_code=403, detail=str(exc)) from exc
 
     scan_id = str(uuid.uuid4())
-    state_db[scan_id] = ScanState(target_url=req.target_url)
+    scan_state = ScanState(target_url=req.target_url, scan_id=scan_id)
+    scan_state.save()
+    state_db[scan_id] = scan_state
 
     orchestrator = LangGraphOrchestrator(scan_id, req.target_url)
     background_tasks.add_task(orchestrator.run_scan)
@@ -237,13 +238,13 @@ Do NOT return JSON.
 Do NOT skip sections.
 Ensure content is detailed and polished."""
 
+    from backend_v2.report_builder import build_report_markdown
+
     try:
-        llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.2)
-        msg = llm.invoke([
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=f"{{SCAN_RESULTS_JSON}}: {json.dumps(scan_json)}"),
-        ])
-        return {"markdown": msg.content}
+        markdown = build_report_markdown(scan_json)
+        if not markdown:
+            return {"error": "report generation failed"}
+        return {"markdown": markdown}
     except Exception as exc:
         return {"error": str(exc)}
 

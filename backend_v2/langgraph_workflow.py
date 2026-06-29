@@ -1,12 +1,27 @@
 from typing import TypedDict, Annotated, Sequence
 import operator
+import os
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
-
-from langchain_groq import ChatGroq
 from backend_v2.tool_registry import SECURITY_TOOLS
-import os
+
+
+# Provide a lightweight local fallback LLM when GROQ_API_KEY is not configured.
+class _LocalFallbackLLM:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def bind_tools(self, tools):
+        return self
+
+    def invoke(self, messages):
+        class _Resp:
+            def __init__(self):
+                self.tool_calls = []
+                self.content = "[local-fallback] no-op planner response"
+
+        return _Resp()
 
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], operator.add]
@@ -15,7 +30,15 @@ class AgentState(TypedDict):
 
 def create_workflow():
     # 1. Setup Planner
-    llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.1)
+    try:
+        if os.getenv("GROQ_API_KEY"):
+            from langchain_groq import ChatGroq
+            llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.1)
+        else:
+            llm = _LocalFallbackLLM()
+    except Exception:
+        llm = _LocalFallbackLLM()
+
     llm_with_tools = llm.bind_tools(SECURITY_TOOLS)
     
     # 2. Nodes

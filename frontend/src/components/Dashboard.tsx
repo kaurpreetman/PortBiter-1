@@ -189,15 +189,23 @@ export default function Dashboard() {
 
         {status !== 'idle' && (
           <div className="bg-gray-900 border border-green-800 p-4 rounded">
-            <div className="flex justify-between mb-2 text-sm">
-              <span>
-                Status: <span className="text-white uppercase">{status}</span>
-              </span>
+            <div className="flex flex-col gap-2 mb-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <span>
+                  Status: <span className="text-white uppercase">{status}</span>
+                </span>
+                {scanId && <span className="ml-3 text-gray-400">Scan ID: {scanId}</span>}
+              </div>
               <span>{progress}%</span>
             </div>
             <div className="w-full bg-gray-800 h-2 rounded overflow-hidden">
               <div className="bg-green-500 h-full transition-all duration-500" style={{ width: `${progress}%` }} />
             </div>
+            {status === 'error' && (
+              <div className="mt-3 text-red-400 text-sm">
+                Scan failed. Please review the logs and try again with a valid target.
+              </div>
+            )}
           </div>
         )}
 

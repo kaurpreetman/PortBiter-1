@@ -3,9 +3,11 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 from langchain_core.tools import tool
 
-from backend_v2.tools.header_checker import header_checker
-from backend_v2.tools.upload_checker import upload_checker
-from backend_v2.tools.xss_scanner import xss_scanner
+from backend_v2.tools.security_headers_checker import security_headers_checker
+from backend_v2.tools.file_upload_tester import file_upload_tester
+from backend_v2.tools.xss_tester import xss_tester
+from backend_v2.tools.sql_injection_tester import sql_injection_tester
+from backend_v2.tools.port_scanner import port_scanner
 
 
 @tool
@@ -85,4 +87,13 @@ def auth_tester(target: str) -> str:
 
 
 # Mapping for registry usage
-SECURITY_TOOLS = [web_crawler, file_exposer, auth_tester, xss_scanner, header_checker, upload_checker]
+SECURITY_TOOLS = [
+    web_crawler,
+    file_exposer,
+    auth_tester,
+    xss_tester,
+    sql_injection_tester,
+    security_headers_checker,
+    file_upload_tester,
+    port_scanner,
+]

@@ -3,6 +3,7 @@ import re
 
 from langchain_core.messages import HumanMessage
 from backend_v2.langgraph_workflow import create_workflow
+from backend_v2.models import Vulnerability
 from backend_v2.state import state_db
 from backend_v2.tool_registry import SECURITY_TOOLS
 
@@ -16,6 +17,7 @@ class LangGraphOrchestrator:
     def append_log(self, text: str):
         state = state_db[self.scan_id]
         state.logs.append(text)
+        state.save()
         print(f"[{self.scan_id}] {text}")
 
     def _build_system_prompt(self) -> str:
@@ -55,105 +57,111 @@ class LangGraphOrchestrator:
         if not lines:
             return None
 
-        if "VULNERABILITY:" in content:
+        if "VULNERABILITY:" in content.upper():
             title = lines[0].split(":", 1)[1].strip() if ":" in lines[0] else lines[0]
             data = {
+                "id": f"vuln-{len(state_db[self.scan_id].vulnerabilities) + 1}",
                 "type": title,
                 "severity": "MEDIUM",
-                "endpoint": "N/A",
-                "reason": "Unknown",
+                "endpoint": self.target_url,
+                "reason": "Not enough details provided.",
                 "impact": "Unknown",
                 "payload": "",
-                "fix": "Review endpoint",
-                "confidence": 50,
+                "fix": "Review the affected endpoint and apply appropriate remediation",
+                "confidence": 50.0,
                 "cvss": 5.0,
             }
             for line in lines[1:]:
-                if line.startswith("RISK:"):
+                if line.upper().startswith("RISK:"):
                     data["severity"] = line.split(":", 1)[1].strip().upper().replace("*", "")
-                elif line.startswith("ENDPOINT:"):
+                elif line.upper().startswith("ENDPOINT:"):
                     data["endpoint"] = line.split(":", 1)[1].strip()
-                elif line.startswith("REASON:"):
+                elif line.upper().startswith("REASON:"):
                     data["reason"] = line.split(":", 1)[1].strip()
-                elif line.startswith("IMPACT:"):
+                elif line.upper().startswith("IMPACT:"):
                     data["impact"] = line.split(":", 1)[1].strip()
-                elif line.startswith("PAYLOAD:"):
+                elif line.upper().startswith("PAYLOAD:"):
                     data["payload"] = line.split(":", 1)[1].strip()
-                elif line.startswith("FIX:"):
+                elif line.upper().startswith("FIX:"):
                     data["fix"] = line.split(":", 1)[1].strip().replace("*", "")
-                elif line.startswith("CONFIDENCE:"):
+                elif line.upper().startswith("CONFIDENCE:"):
                     try:
-                        data["confidence"] = int(line.split(":", 1)[1].strip().replace("%", ""))
+                        data["confidence"] = float(line.split(":", 1)[1].strip().replace("%", ""))
                     except ValueError:
                         pass
-            sev = data["severity"]
-            if "CRITICAL" in sev:
+            severity = data["severity"]
+            if "CRITICAL" in severity:
                 data["cvss"] = 9.8
-            elif "HIGH" in sev:
+            elif "HIGH" in severity:
                 data["cvss"] = 8.0
-            elif "MEDIUM" in sev:
+            elif "MEDIUM" in severity:
                 data["cvss"] = 5.0
             else:
                 data["cvss"] = 3.0
-            return data
+            return Vulnerability(**data)
 
         return None
 
     def _parse_tool_findings(self, content: str):
         findings = []
-        if "XSS FOUND" in content:
-            severity = "HIGH"
-            endpoint = self.target_url
-            if self._extract_urls(content):
-                endpoint = self._extract_urls(content)[0]
-            findings.append({
-                "type": "Reflected XSS",
-                "severity": severity,
-                "endpoint": endpoint,
-                "reason": "The target reflected a test payload in the response body",
-                "impact": "An attacker could execute script in the victim's browser",
-                "payload": content,
-                "fix": "Sanitize and encode untrusted input before rendering it in HTML",
-                "confidence": 90,
-                "cvss": 8.0,
-            })
-        elif "SQL INJECTION FOUND" in content:
-            findings.append({
-                "type": "SQL Injection",
-                "severity": "HIGH",
-                "endpoint": self._extract_urls(content)[0] if self._extract_urls(content) else self.target_url,
-                "reason": "The authentication endpoint accepted a crafted SQL payload and returned a success-like response",
-                "impact": "An attacker could bypass authentication or extract data",
-                "payload": content,
-                "fix": "Use parameterized queries and proper input validation",
-                "confidence": 90,
-                "cvss": 8.0,
-            })
-        elif "MISSING HEADER" in content or "WEAK HEADER" in content:
-            findings.append({
-                "type": "Security Headers Misconfiguration",
-                "severity": "MEDIUM",
-                "endpoint": self.target_url,
-                "reason": "One or more important security headers were missing or weak",
-                "impact": "Attackers may exploit clickjacking, MIME sniffing, or downgrade attacks",
-                "payload": content,
-                "fix": "Add or harden security headers such as CSP, HSTS, and X-Frame-Options",
-                "confidence": 80,
-                "cvss": 5.0,
-            })
-        elif "UPLOAD VULNERABILITY" in content:
-            findings.append({
-                "type": "Insecure File Upload",
-                "severity": "HIGH",
-                "endpoint": self._extract_urls(content)[0] if self._extract_urls(content) else self.target_url,
-                "reason": "The target accepted file uploads without visible validation",
-                "impact": "An attacker may upload malicious content or exploit server-side handling",
-                "payload": content,
-                "fix": "Enforce file type, size, and content validation before storing uploads",
-                "confidence": 85,
-                "cvss": 8.0,
-            })
-        return findings
+        lower = content.lower()
+
+        if "xss found" in lower:
+            endpoint = self._extract_urls(content)
+            findings.append(Vulnerability(
+                id=f"vuln-{len(state_db[self.scan_id].vulnerabilities) + len(findings) + 1}",
+                type="Reflected XSS",
+                severity="HIGH",
+                endpoint=endpoint[0] if endpoint else self.target_url,
+                reason="The target reflected an unescaped payload in a response body.",
+                impact="An attacker may execute JavaScript in a victim's browser.",
+                payload=content,
+                fix="Encode output and sanitize untrusted input before rendering it in HTML.",
+                confidence=90.0,
+                cvss=8.0,
+            ))
+        if "sql injection found" in lower:
+            endpoint = self._extract_urls(content)
+            findings.append(Vulnerability(
+                id=f"vuln-{len(state_db[self.scan_id].vulnerabilities) + len(findings) + 1}",
+                type="SQL Injection",
+                severity="HIGH",
+                endpoint=endpoint[0] if endpoint else self.target_url,
+                reason="A crafted SQL payload triggered a success-like response.",
+                impact="An attacker could bypass authentication or access sensitive data.",
+                payload=content,
+                fix="Use parameterized queries, ORM prepared statements, and validate inputs.",
+                confidence=90.0,
+                cvss=8.0,
+            ))
+        if "missing headers" in lower or "security headers" in lower or "cookie flags" in lower:
+            findings.append(Vulnerability(
+                id=f"vuln-{len(state_db[self.scan_id].vulnerabilities) + len(findings) + 1}",
+                type="Security Headers Misconfiguration",
+                severity="MEDIUM",
+                endpoint=self.target_url,
+                reason="Important security headers or cookie flags were absent.",
+                impact="The application may be vulnerable to clickjacking, MIME sniffing, or session hijacking.",
+                payload=content,
+                fix="Add missing headers such as CSP, HSTS, and X-Frame-Options, and enforce secure cookie flags.",
+                confidence=80.0,
+                cvss=5.0,
+            ))
+        if "file upload" in lower or "upload endpoint" in lower:
+            findings.append(Vulnerability(
+                id=f"vuln-{len(state_db[self.scan_id].vulnerabilities) + len(findings) + 1}",
+                type="Insecure File Upload",
+                severity="HIGH",
+                endpoint=self._extract_urls(content)[0] if self._extract_urls(content) else self.target_url,
+                reason="A file upload endpoint appears reachable and may accept uploads.",
+                impact="An attacker could upload malicious content or exploit server-side handling.",
+                payload=content,
+                fix="Validate file types, sizes, and content on the server before accepting uploads.",
+                confidence=85.0,
+                cvss=8.0,
+            ))
+
+        return [finding.dict() for finding in findings]
 
     async def run_scan(self):
         self.append_log("Initializing LangGraph Autonomous Scan...")
@@ -191,20 +199,27 @@ class LangGraphOrchestrator:
                         msg = value["messages"][-1]
                         self.append_log(f"🛠️ Execution Phase: Tool Result: {msg.content}")
                         tool_call_count += 1
+                        state = state_db[self.scan_id]
                         progress = min(int((tool_call_count / expected_tool_steps) * 95), 95)
-                        state_db[self.scan_id].progress = progress
-                        state_db[self.scan_id].visited_urls.extend(self._extract_urls(msg.content))
-                        if self.target_url not in state_db[self.scan_id].visited_urls:
-                            state_db[self.scan_id].visited_urls.append(self.target_url)
+                        state.progress = progress
+                        state.visited_urls.extend(self._extract_urls(msg.content))
+                        if self.target_url not in state.visited_urls:
+                            state.visited_urls.append(self.target_url)
 
                         parsed_findings = self._parse_tool_findings(msg.content)
                         for finding in parsed_findings:
-                            state_db[self.scan_id].vulnerabilities.append(finding)
+                            if isinstance(finding, dict):
+                                state.vulnerabilities.append(finding)
+                            else:
+                                state.vulnerabilities.append(finding.dict())
+                        state.save()
 
                 await asyncio.sleep(1)
 
-            state_db[self.scan_id].status = "completed"
-            state_db[self.scan_id].progress = 100
+            state = state_db[self.scan_id]
+            state.status = "completed"
+            state.progress = 100
+            state.save()
             self.append_log("Scan completed successfully via LangGraph.")
         except Exception as exc:
             self.append_log(f"LangGraph execution error: {exc}")
