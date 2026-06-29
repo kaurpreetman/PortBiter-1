@@ -5,7 +5,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 
 from langchain_groq import ChatGroq
-from tool_registry import SECURITY_TOOLS
+from backend_v2.tool_registry import SECURITY_TOOLS
 import os
 
 class AgentState(TypedDict):

@@ -1,7 +1,5 @@
-import os
-import json
-from langchain_groq import ChatGroq
-from langchain_core.tools import tool
+from datetime import datetime
+
 
 class ScanState:
     def __init__(self, target_url: str):
@@ -11,5 +9,7 @@ class ScanState:
         self.logs = []
         self.status = "running"
         self.progress = 0
+        self.started_at = datetime.utcnow().isoformat()
+
 
 state_db = {}
