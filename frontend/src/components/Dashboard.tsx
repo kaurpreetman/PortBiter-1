@@ -4,8 +4,10 @@ import { PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 import { VulnerabilityList } from './VulnerabilityList';
 import { Vulnerability } from './VulnerabilityCard';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const WS_BASE = API_BASE.startsWith('https') ? API_BASE.replace('https', 'wss') : API_BASE.replace('http', 'ws');
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'https://port-biter-1.vercel.app').replace(/\/+$/, '');
+const WS_BASE = API_BASE.startsWith('https://')
+  ? API_BASE.replace(/^https:\/\//, 'wss://')
+  : API_BASE.replace(/^http:\/\//, 'ws://');
 
 type ScanSummary = {
   scan_id: string;
@@ -17,7 +19,7 @@ type ScanSummary = {
 };
 
 export default function Dashboard() {
-  const [targetUrl, setTargetUrl] = useState('http://127.0.0.1:8000');
+  const [targetUrl, setTargetUrl] = useState('https://port-biter-front.vercel.app');
   const [scanId, setScanId] = useState('');
   const [status, setStatus] = useState('idle');
   const [progress, setProgress] = useState(0);
@@ -45,7 +47,9 @@ export default function Dashboard() {
   const loadScan = async (id: string) => {
     try {
       const res = await fetch(`${API_BASE}/scan/${id}`);
+      if (!res.ok) throw new Error(`Could not load scan (${res.status})`);
       const data = await res.json();
+      if (data.error) throw new Error(data.error);
       setScanId(id);
       setStatus(data.status || 'completed');
       setProgress(data.progress || 0);
@@ -53,6 +57,8 @@ export default function Dashboard() {
       setVulns(data.vulnerabilities || []);
     } catch (error) {
       console.error(error);
+      setStatus('error');
+      setLogs((prev) => [...prev, error instanceof Error ? error.message : 'Could not load scan.']);
     }
   };
 
@@ -107,6 +113,7 @@ export default function Dashboard() {
     } catch (error) {
       console.error(error);
       setStatus('error');
+      setLogs((prev) => [...prev, error instanceof Error ? error.message : 'Could not connect to the backend.']);
     }
   };
 
@@ -137,7 +144,13 @@ export default function Dashboard() {
       }
     };
 
-    ws.current.onclose = () => setStatus('completed');
+    ws.current.onerror = () => {
+      setStatus('error');
+      setLogs((prev) => [...prev, '❌ WebSocket connection to the backend failed.']);
+    };
+    ws.current.onclose = () => {
+      setStatus((current) => current === 'running' || current === 'starting' ? 'error' : current);
+    };
   };
 
   const severityChartData = Object.entries(
