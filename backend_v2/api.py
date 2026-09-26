@@ -19,10 +19,21 @@ load_dotenv()
 
 app = FastAPI(title="PortBiter APIs v2 (LangGraph + Groq)")
 
+allowed_origins = {
+    "https://port-biter-front.vercel.app",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+}
+allowed_origins.update(
+    origin.strip().rstrip("/")
+    for origin in os.getenv("FRONTEND_ORIGINS", "").split(",")
+    if origin.strip()
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=sorted(allowed_origins),
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
