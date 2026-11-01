@@ -4,7 +4,10 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "scan_state.db")
+_default_db_path = os.path.join(os.path.dirname(__file__), "scan_state.db")
+if os.getenv("VERCEL"):
+    _default_db_path = os.path.join("/tmp", "portbiter_scan_state.db")
+DB_PATH = os.getenv("PORTBITER_DB_PATH", _default_db_path)
 
 
 def _get_connection():
