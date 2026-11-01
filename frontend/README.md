@@ -5,7 +5,7 @@ This frontend renders the PortBiter dashboard and talks to the FastAPI backend o
 ## Required setup
 
 1. Start the backend first, typically on port 8000.
-2. Set `NEXT_PUBLIC_API_URL` to the backend's origin (scheme included, no path), not the frontend's URL. For local development, use `http://localhost:8000`; for deployment, use `https://port-biter-1.vercel.app` or the current public URL of the FastAPI service. This value is embedded in the frontend at build time, so set it in the frontend deployment's environment settings and redeploy after changing it.
+2. Set `NEXT_PUBLIC_API_URL` to the backend's origin (scheme included, no path), not the frontend's URL. For local development, use `http://localhost:8000`; for deployment, use `https://portbiter-1.onrender.com` or the current public URL of the FastAPI service. This value is embedded in the frontend at build time, so set it in the frontend deployment's environment settings and redeploy after changing it.
 3. Install dependencies and run the dev server:
 
 ```bash

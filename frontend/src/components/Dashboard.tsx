@@ -4,7 +4,7 @@ import { PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 import { VulnerabilityList } from './VulnerabilityList';
 import { Vulnerability } from './VulnerabilityCard';
 
-const DEFAULT_API_URL = 'https://port-biter-1.vercel.app';
+const DEFAULT_API_URL = 'https://portbiter-1.onrender.com';
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_URL).replace(/\/+$/, '');
 const WS_BASE = API_BASE.startsWith('https://')
   ? API_BASE.replace(/^https:\/\//, 'wss://')
