@@ -10,6 +10,8 @@ from backend_v2.tool_registry import SECURITY_TOOLS
 class NoLLMConfiguredError(RuntimeError):
     """Raised when autonomous planning was requested without a configured LLM backend."""
 
+MAX_PLANNER_MESSAGES = 16
+
 
 class _LocalFallbackLLM:
     def __init__(self, *args, **kwargs):
@@ -59,6 +61,8 @@ def create_workflow():
         messages = state["messages"]
         last_message = messages[-1]
         
+        if len(messages) >= MAX_PLANNER_MESSAGES:
+            return "end"
         if last_message.tool_calls:
             return "tools"
         return "end"

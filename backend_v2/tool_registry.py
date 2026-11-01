@@ -1,7 +1,8 @@
 import httpx
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urldefrag, urljoin, urlparse
 from langchain_core.tools import tool
+from backend_v2.tools.recon_helper import normalize_url
 
 from backend_v2.tools.security_headers_checker import security_headers_checker
 from backend_v2.tools.file_upload_tester import file_upload_tester
@@ -13,19 +14,51 @@ from backend_v2.tools.port_scanner import port_scanner
 @tool
 def web_crawler(target: str) -> str:
     """Discovers endpoints on the target web application safely."""
-    try:
-        res = httpx.get(target, timeout=10.0, follow_redirects=True, verify=False)
-        soup = BeautifulSoup(res.text, "html.parser")
-        links = []
-        for a in soup.find_all("a", href=True):
-            href = a["href"]
-            full_url = urljoin(target, href)
-            if urlparse(full_url).netloc == urlparse(target).netloc:
-                links.append(full_url)
-        endpoints = list(set(links))[:5]
-        return f"Crawled endpoints: {endpoints}"
-    except Exception as e:
-        return f"Crawler failed: {str(e)}"
+    target_url = normalize_url(target)
+    target_url, _ = urldefrag(target_url)
+    target_host = urlparse(target_url).netloc
+    timeout = httpx.Timeout(connect=5.0, read=12.0, write=5.0, pool=5.0)
+    headers = {
+        "User-Agent": "PortBiter/3.0 security scanner",
+        "Accept": "text/html,application/xhtml+xml",
+    }
+
+    for attempt in range(2):
+        try:
+            with httpx.Client(
+                timeout=timeout,
+                follow_redirects=True,
+                verify=False,
+                headers=headers,
+            ) as client:
+                response = client.get(target_url)
+            if response.status_code >= 400:
+                return f"Crawler failed: target returned HTTP {response.status_code}"
+
+            soup = BeautifulSoup(response.text[:2_000_000], "html.parser")
+            endpoints = []
+            seen = set()
+            for anchor in soup.find_all("a", href=True):
+                full_url, _ = urldefrag(urljoin(str(response.url), anchor["href"]))
+                parsed = urlparse(full_url)
+                if parsed.scheme not in {"http", "https"} or parsed.netloc != target_host:
+                    continue
+                if full_url not in seen:
+                    seen.add(full_url)
+                    endpoints.append(full_url)
+                if len(endpoints) == 10:
+                    break
+            return f"Crawled endpoints: {endpoints}"
+        except httpx.TimeoutException as exc:
+            if attempt == 1:
+                return f"Crawler failed after 2 attempts: request timed out ({exc})"
+        except httpx.RequestError as exc:
+            if attempt == 1:
+                return f"Crawler failed after 2 attempts: {exc}"
+        except Exception as exc:
+            return f"Crawler failed: {exc}"
+
+    return "Crawler failed after 2 attempts: request did not complete"
 
 
 @tool
