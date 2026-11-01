@@ -4,7 +4,8 @@ import { PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 import { VulnerabilityList } from './VulnerabilityList';
 import { Vulnerability } from './VulnerabilityCard';
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'https://port-biter-1.vercel.app').replace(/\/+$/, '');
+const DEFAULT_API_URL = 'https://port-biter-1-6ycsjzvcf-kaurpreetmans-projects.vercel.app';
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_URL).replace(/\/+$/, '');
 const WS_BASE = API_BASE.startsWith('https://')
   ? API_BASE.replace(/^https:\/\//, 'wss://')
   : API_BASE.replace(/^http:\/\//, 'ws://');
@@ -27,6 +28,7 @@ export default function Dashboard() {
   const [vulns, setVulns] = useState<Vulnerability[]>([]);
   const [loadingReport, setLoadingReport] = useState(false);
   const [scanHistory, setScanHistory] = useState<ScanSummary[]>([]);
+  const [apiError, setApiError] = useState('');
   const ws = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -36,15 +38,21 @@ export default function Dashboard() {
   const loadScanHistory = async () => {
     try {
       const res = await fetch(`${API_BASE}/scans`);
-      if (!res.ok) return;
+      if (!res.ok) {
+        setApiError(`Backend API returned HTTP ${res.status} at ${API_BASE}. Verify NEXT_PUBLIC_API_URL points to the FastAPI service, not a frontend deployment.`);
+        return;
+      }
       const data = await res.json();
       setScanHistory(data);
+      setApiError('');
     } catch (error) {
       console.error(error);
+      setApiError(`Could not reach the backend at ${API_BASE}. Check its URL, deployment, and CORS configuration.`);
     }
   };
 
   const loadScan = async (id: string) => {
+    if (!API_BASE) return;
     try {
       const res = await fetch(`${API_BASE}/scan/${id}`);
       if (!res.ok) throw new Error(`Could not load scan (${res.status})`);
@@ -63,7 +71,7 @@ export default function Dashboard() {
   };
 
   const downloadPdf = async () => {
-    if (!scanId) return;
+    if (!scanId || !API_BASE) return;
     setLoadingReport(true);
     try {
       const res = await fetch(`${API_BASE}/report/pdf/${scanId}`);
@@ -86,6 +94,10 @@ export default function Dashboard() {
   };
 
   const startScan = async () => {
+    if (!API_BASE) {
+      setApiError('Backend API is not configured. Set NEXT_PUBLIC_API_URL to the public FastAPI backend URL in the frontend deployment settings, then redeploy.');
+      return;
+    }
     setLogs(['🚀 Starting scan...']);
     setVulns([]);
     setProgress(0);
@@ -113,7 +125,9 @@ export default function Dashboard() {
     } catch (error) {
       console.error(error);
       setStatus('error');
-      setLogs((prev) => [...prev, error instanceof Error ? error.message : 'Could not connect to the backend.']);
+      const message = error instanceof Error ? error.message : 'Could not connect to the backend.';
+      setApiError(`Could not reach the backend at ${API_BASE}. Check its URL, deployment, and CORS configuration.`);
+      setLogs((prev) => [...prev, message]);
     }
   };
 
@@ -171,6 +185,12 @@ export default function Dashboard() {
             <span className="text-sm text-gray-400">AI-Powered Web Vulnerability Scanner</span>
           </div>
         </div>
+
+        {apiError && (
+          <div className="rounded border border-red-700 bg-red-950/40 p-4 text-sm text-red-300" role="alert">
+            {apiError}
+          </div>
+        )}
 
         <div className="flex gap-4">
           <input
