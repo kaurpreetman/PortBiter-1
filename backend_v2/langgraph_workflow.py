@@ -39,7 +39,7 @@ def create_workflow():
     try:
         from langchain_groq import ChatGroq
         llm = ChatGroq(
-            model=os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
+            model=os.getenv("GROQ_MODEL", "openai/gpt-oss-20b"),
             temperature=0.1,
         )
     except Exception as exc:

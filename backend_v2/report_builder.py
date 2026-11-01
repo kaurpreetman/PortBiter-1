@@ -28,7 +28,7 @@ def build_report_markdown(scan_json: dict) -> str:
         try:
             from langchain_groq import ChatGroq
             llm = ChatGroq(
-                model=os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
+                model=os.getenv("GROQ_MODEL", "openai/gpt-oss-20b"),
                 temperature=0.2,
             )
             system_prompt = _build_system_prompt(vuln_types)
