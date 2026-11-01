@@ -27,7 +27,10 @@ def build_report_markdown(scan_json: dict) -> str:
     if os.getenv("GROQ_API_KEY"):
         try:
             from langchain_groq import ChatGroq
-            llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.2)
+            llm = ChatGroq(
+                model=os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
+                temperature=0.2,
+            )
             system_prompt = _build_system_prompt(vuln_types)
             msg = llm.invoke([
                 SystemMessage(content=system_prompt),

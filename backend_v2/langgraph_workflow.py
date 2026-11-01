@@ -38,7 +38,10 @@ def create_workflow():
     # 1. Setup Planner
     try:
         from langchain_groq import ChatGroq
-        llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.1)
+        llm = ChatGroq(
+            model=os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
+            temperature=0.1,
+        )
     except Exception as exc:
         raise NoLLMConfiguredError("Unable to initialize the Groq-backed planner. Check LANGCHAIN or Groq installation details.") from exc
 
